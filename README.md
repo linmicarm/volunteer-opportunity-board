@@ -75,7 +75,6 @@ src/
 │   ├── MyOpportunities.jsx      # Renders the user's posted opportunities
 │   └── Footer.jsx               # Static footer
 └── lib/                         # Business logic, kept out of the components
-    ├── stats.js                 # totalOpportunities, remoteCount
     ├── formatLocation.js        # Turns the messy `audience` object into a clean string
     ├── formatDate.js            # Formats ISO dates; leaves API date strings untouched
     ├── categoryColor.js         # Maps a category to a consistent sticker color
@@ -114,7 +113,7 @@ All non-trivial logic is separated into the `lib/` folder so the components stay
 - **`formatCategories` / `getCategories`** — pulls categories out of the nested `activities` array, removes duplicates with a `Set`, and returns clean strings.
 - **`formatDate`** — formats user-entered ISO dates ("2026-06-15" → "June 15, 2026") while leaving the API's pre-formatted date ranges untouched. Appends a local-time marker to avoid an off-by-one-day timezone bug.
 - **`categoryColor`** — deterministically maps each category to one of four colors, so the same category always gets the same sticker color.
-- **`stats`** — counts total and remote opportunities for the header.
+- **`filters`** — the search, category-filter, and sort logic, plus a `getCategories` helper that normalizes the two different category shapes (API vs. user-created).
 ---
  
 ## What I Learned
