@@ -393,3 +393,39 @@ footer {
 .date-field input {
   width: 100%;             /* fill the column so both pickers match width */
 }
+
+/* ---- pagination control ---- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 22px 0 8px;
+}
+.page-btn {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--paper);
+  background: var(--ink);
+  border: 2px solid var(--ink);
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.page-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--red);
+}
+.page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.page-status {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  color: var(--ink);
+}

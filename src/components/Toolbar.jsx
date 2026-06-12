@@ -1,7 +1,7 @@
 // ===========================================================================
 // Toolbar.jsx — groups the board's controls in one place: the search box,
-// a sort dropdown, the "Showing X of Y" count, and a chip showing the
-// currently active category filter (with a button to clear it).
+// a sort dropdown, a results count, and a chip showing the currently active
+// category filter (with a button to clear it).
 //
 // Like all the display components, it owns no data of its own — everything
 // comes in as props, and user actions are reported back up via callbacks.
@@ -14,9 +14,24 @@ function Toolbar({
   onSortChange,
   activeCategory,
   onClearCategory,
-  shownCount,
-  totalCount,
+  rangeStart,
+  rangeEnd,
+  apiTotal,
+  isFiltered,
+  filteredCount,
 }) {
+  // The count text adapts to context:
+  //  - Filtering (search or category active): we can only filter what's been
+  //    loaded so far, so we report the number of matches found.
+  //  - Browsing normally: show the production-standard "Showing X–Y of TOTAL"
+  //    range, where TOTAL is the API's true catalog count.
+  let countText;
+  if (isFiltered) {
+    countText = `${filteredCount} match${filteredCount === 1 ? "" : "es"} in loaded results`;
+  } else {
+    countText = `Showing ${rangeStart}–${rangeEnd} of ${apiTotal.toLocaleString()}`;
+  }
+
   return (
     <div className="toolbar">
       <div className="toolbar-row">
@@ -43,14 +58,10 @@ function Toolbar({
       </div>
 
       <div className="toolbar-row toolbar-status">
-        {/* Plain-language result count so the filtering is legible. */}
-        <span className="result-count">
-          Showing {shownCount} of {totalCount}
-        </span>
+        <span className="result-count">{countText}</span>
 
         {/* The active category filter only appears when one is set. Clicking
-            the × clears it. Conditional rendering with && is the React idiom
-            for "show this only when the condition is true." */}
+            the × clears it. */}
         {activeCategory && (
           <button className="filter-chip" onClick={onClearCategory}>
             {activeCategory} <span aria-hidden="true">×</span>
