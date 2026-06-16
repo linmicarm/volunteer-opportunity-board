@@ -429,3 +429,17 @@ footer {
   letter-spacing: 0.5px;
   color: var(--ink);
 }
+
+/* ---- background-loading status ---- */
+.bg-load-status {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 2px dashed var(--ink-soft);
+  display: inline-block;
+}

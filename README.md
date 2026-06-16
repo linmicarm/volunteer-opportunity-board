@@ -101,7 +101,7 @@ src/
  
 **Search, filter, and sort.** Rather than storing a separate "filtered list" in state (which would risk getting out of sync), the visible list is **recomputed on every render** from the full list plus the active controls. The logic lives in `lib/filters.js`.
  
-**Pagination (load on demand).** The API is paginated and holds over 1,300 opportunities, so the app fetches **one page at a time**. Page 1 loads on mount for a fast first render; clicking "Next" fetches the following page from the API's `next` URL only if those results haven't been loaded yet, and appends them to the running list. Already-seen pages are cached, so paging backward never re-fetches. The toolbar shows a production-style "Showing 1–6 of 1,353" range using the API's true `count`. A `useRef` guard ensures the initial fetch runs only once, even though React's Strict Mode invokes effects twice in development.
+**Pagination & background loading.** The API is paginated and holds over 1,300 opportunities. To balance a fast first render against full-catalog search, the app fetches **page 1 first and displays it immediately**, then quietly fetches every remaining page in the **background**, appending each as it arrives. A small status line ("Loading all opportunities… 340 of 1,353 loaded") shows progress and disappears when done. Because search, filter, and pagination all read from the growing list, they automatically cover more of the catalog as it streams in — and the full set within a few seconds. Paging itself is instant local slicing. The toolbar shows a production-style "Showing 1–6 of 1,353" range using the API's true `count`, and a `useRef` guard ensures the loader runs only once despite React Strict Mode's double-invoke in development.
  
 ---
  
@@ -162,12 +162,13 @@ Manual checks to confirm everything works:
  
 ## What I'd Do Differently / Future Improvements
  
-- **Search across the full catalog.** Because pages load on demand, search and category filters currently only look at opportunities that have been **loaded so far** — a match on an unloaded page won't appear until the user pages to it. This is the deliberate tradeoff for a fast first render (the alternative, loading all 1,300+ up front, made the initial load take 30+ seconds). A fuller version would send the search term to the API endpoint so the server does the filtering across the whole catalog.
+- **True server-side search.** The Volunteer Connector API has no free-text search parameter — it only filters by category/cause IDs. To make typed search cover the whole catalog, the app loads all pages in the background and searches them client-side. This works well, but means there's a brief window during initial load where search is still incomplete (shown by the loading status). A fuller solution would use an API that supports server-side text queries, so the browser wouldn't need the entire dataset in memory.
 - **Validate the date range.** The form currently allows an end date earlier than the start date. A check in the submit handler could prevent that.
 - **Edit functionality.** The app supports create, read, and delete; adding *update* would complete full CRUD.
 - **Avoid prop drilling.** As the app grew, the category-click function gets passed through several layers. React Context would clean this up in a larger app.
 - **Extract a custom hook.** The fetch logic could be moved into a reusable `useFetch` hook.
 - **Tests.** The `lib/` helpers are pure functions and would be straightforward to unit test.
+
 ---
  
 ## Built With

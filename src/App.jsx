@@ -23,11 +23,11 @@ const API_URL = "https://www.volunteerconnector.org/api/search/";
 
 function App() {
   // --- State: the API data and its lifecycle flags ---
-  const [opportunities, setOpportunities] = useState([]); // fetched so far (grows as you page)
-  const [loading, setLoading] = useState(true);           // true while a page is being fetched
+  const [opportunities, setOpportunities] = useState([]); // all opportunities loaded so far
+  const [loading, setLoading] = useState(true);           // true only during the FIRST page load
   const [error, setError] = useState(false);              // true if a fetch failed
-  const [nextUrl, setNextUrl] = useState(null);           // URL of the next page to fetch (null = no more)
   const [apiTotal, setApiTotal] = useState(0);            // the API's true total count of opportunities
+  const [loadingAll, setLoadingAll] = useState(true);     // true while background-loading the rest
 
   // --- State: the user's own created opportunities (persisted to localStorage) ---
   const [myOpportunities, setMyOpportunities] = useState([]);
@@ -62,9 +62,8 @@ function App() {
   );
 
   // -------------------------------------------------------------------------
-  // Pagination state. We only show one PAGE_SIZE slice of what's been loaded.
-  // Because we load pages on demand, "total pages" is NOT known up front — we
-  // only know there's more to fetch if nextUrl is not null.
+  // Pagination state. We show one PAGE_SIZE slice of what's loaded so far.
+  // totalLoadedPages grows as the background loader brings in more pages.
   // -------------------------------------------------------------------------
   const totalLoadedPages = Math.max(
     1,
@@ -76,9 +75,9 @@ function App() {
     sliceStart + PAGE_SIZE
   );
 
-  // There's a "next" page available if either we have more already-loaded
-  // pages ahead of the current one, OR the API has more pages to fetch.
-  const hasNextPage = currentPage < totalLoadedPages || nextUrl !== null;
+  // There's a "next" page if there are more loaded pages ahead, OR the
+  // background loader is still bringing more in.
+  const hasNextPage = currentPage < totalLoadedPages || loadingAll;
 
   // Range for the "Showing 1–6 of 1,353" count. rangeStart/rangeEnd describe
   // which slice of the full catalog the current page represents.
@@ -92,58 +91,62 @@ function App() {
   }, [search, activeCategory, sortBy]);
 
   // -------------------------------------------------------------------------
-  // fetchPage: fetch ONE page from a given URL, append its results to what we
-  // already have, and remember the URL of the page after it. Shared by both
-  // the initial load and the "Next" button.
-  // -------------------------------------------------------------------------
-  async function fetchPage(url) {
-    setLoading(true);
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Request failed");
-      const json = await res.json();
-      // Append this page's results to the running list.
-      setOpportunities((prev) => prev.concat(json.results));
-      // Remember where the NEXT page lives (or null if this was the last).
-      setNextUrl(json.next);
-      // The API reports the true total in every response; capture it once.
-      setApiTotal(json.count);
-    } catch (err) {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Effect 1: fetch only the FIRST page on mount, so the board appears fast.
+  // Loading strategy: fetch page 1 first and show it immediately (fast first
+  // render). Then keep fetching the remaining pages in the BACKGROUND, so the
+  // full catalog ends up in memory and search/filter can cover everything —
+  // without making the user wait for all of it up front.
   // -------------------------------------------------------------------------
   useEffect(() => {
-    if (didInitialFetch.current) return; // already fetched — skip Strict Mode's 2nd run
+    if (didInitialFetch.current) return; // run once, even under Strict Mode's double-invoke
     didInitialFetch.current = true;
-    fetchPage(API_URL);
+
+    async function loadAllPages() {
+      let url = API_URL;
+      let isFirstPage = true;
+
+      try {
+        while (url) {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("Request failed");
+          const json = await res.json();
+
+          // Append this page's results to the growing list.
+          setOpportunities((prev) => prev.concat(json.results));
+          setApiTotal(json.count);
+
+          // After the FIRST page arrives, drop the main loading flag so the
+          // board renders right away. The rest stream in quietly behind it.
+          if (isFirstPage) {
+            setLoading(false);
+            isFirstPage = false;
+          }
+
+          url = json.next; // advance to the next page (null = we're done)
+        }
+      } catch (err) {
+        setError(true);
+        setLoading(false);
+      } finally {
+        // Whether we finished or hit the end, background loading is over.
+        setLoadingAll(false);
+      }
+    }
+
+    loadAllPages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // -------------------------------------------------------------------------
-  // Navigation handlers. Going to the previous page never needs a fetch.
-  // Going to the next page fetches more from the API only if we don't already
-  // have enough loaded to fill that page.
+  // Navigation handlers. With all pages streaming in via the background loader,
+  // paging is now pure local slicing — no fetching needed here.
   // -------------------------------------------------------------------------
   function goToPrevPage() {
     setCurrentPage((p) => Math.max(1, p - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function goToNextPage() {
-    const nextPage = currentPage + 1;
-    // How many items do we need loaded to fill the page we're moving to?
-    const needed = nextPage * PAGE_SIZE;
-    // If we don't have enough AND the API has more, fetch the next page first.
-    if (visibleOpportunities.length < needed && nextUrl) {
-      await fetchPage(nextUrl);
-    }
-    setCurrentPage(nextPage);
+  function goToNextPage() {
+    setCurrentPage((p) => p + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -211,6 +214,16 @@ function App() {
       />
 
       <h2>Browse Opportunities</h2>
+
+      {/* While the rest of the catalog streams in behind page 1, show a quiet
+          status so the user knows search isn't complete yet. */}
+      {loadingAll && !error && opportunities.length > 0 && (
+        <p className="bg-load-status">
+          Loading all opportunities… {opportunities.length.toLocaleString()} of{" "}
+          {apiTotal.toLocaleString()} loaded
+        </p>
+      )}
+
       <OpportunityList
         opportunities={pagedOpportunities}
         loading={loading && opportunities.length === 0}
@@ -218,15 +231,15 @@ function App() {
         onCategoryClick={handleCategoryClick}
         activeCategory={activeCategory}
       />
-      {/* Pagination shows once the first page has loaded. During a later page
-          fetch the cards stay visible and only the Next button shows Loading. */}
+      {/* Paging is instant local slicing now, so the Next button never shows a
+          loading state. */}
       {!error && opportunities.length > 0 && (
         <Pagination
           currentPage={currentPage}
           hasNextPage={hasNextPage}
           onPrev={goToPrevPage}
           onNext={goToNextPage}
-          loading={loading}
+          loading={false}
         />
       )}
 
